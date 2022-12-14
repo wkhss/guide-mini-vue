@@ -1,5 +1,9 @@
 import { extend } from "../shared";
 
+
+let activeEffect
+let shouldTrack
+
 class ReactiveEffect{
     private _fn: any;
     deps=[];
@@ -9,8 +13,14 @@ class ReactiveEffect{
         this._fn=fn
     }
     run(){
-        reactiveEffect=this
-        return this._fn()
+        if(!this.active){
+            return this._fn()
+        }
+        activeEffect=this
+        shouldTrack=true
+        const result=this._fn()
+        shouldTrack=false
+        return result
     }
     stop(){
         // 优化 清除过后 不用再次清理
@@ -28,10 +38,14 @@ function cleanupEffect(effect){
     effect.deps.forEach(dep => {
         dep.delete(effect)// deps => Set() 因此 使用 delete() 删除
     });
+    effect.deps.lenght=0
 }
 
 const targetMap=new Map()
 export function track(target,key){
+
+    if (!isTracking()) return  
+
     // target -> key -> dep
     let depsMap=targetMap.get(target)
     if(!depsMap){
@@ -45,10 +59,16 @@ export function track(target,key){
         depsMap.set(key,dep)
     }
 
-    if(!reactiveEffect) return // 当执行 effect() 时才会 使用到下面的代码
+    if(dep.has(activeEffect)) return 
 
-    dep.add(reactiveEffect)
-    reactiveEffect.deps.push(dep)
+    dep.add(activeEffect)
+    activeEffect.deps.push(dep)
+}
+
+function isTracking(){
+    // if(!activeEffect) return // 当执行 effect() 时才会 使用到下面的代码
+    // if(!shouldTrack) return 
+    return shouldTrack && activeEffect !== undefined
 }
 
 export function trigger(target,key){
@@ -63,7 +83,6 @@ export function trigger(target,key){
     }
 }
 
-let reactiveEffect
 export function effect(fn, options:any={}){
     const _effect=new ReactiveEffect(fn,options.scheduler)
     // options 对功能模块进行抽离 使其应用时更有寓意话
