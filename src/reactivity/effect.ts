@@ -59,13 +59,17 @@ export function track(target,key){
         depsMap.set(key,dep)
     }
 
-    if(dep.has(activeEffect)) return 
+    trackEffects(dep)
+}
 
+export function trackEffects(dep){
+    if(dep.has(activeEffect)) return 
+    
     dep.add(activeEffect)
     activeEffect.deps.push(dep)
 }
 
-function isTracking(){
+export function isTracking(){
     // if(!activeEffect) return // 当执行 effect() 时才会 使用到下面的代码
     // if(!shouldTrack) return 
     return shouldTrack && activeEffect !== undefined
@@ -74,6 +78,11 @@ function isTracking(){
 export function trigger(target,key){
     const depsMap=targetMap.get(target)
     const dep=depsMap.get(key)
+
+    triggerEffect(dep)
+}
+
+export function triggerEffect(dep){
     for(const effect of dep){
         if(effect.scheduler){
             effect.scheduler()
