@@ -1,3 +1,4 @@
+import { h } from '../../lib/guide-mini-vue.esm.js'
 export const App={
     // App.vue
     // <template></template> -> render
