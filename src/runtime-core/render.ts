@@ -1,3 +1,4 @@
+import { isObject } from "../shared"
 import { createComponentInstance, setupComponent} from "./component"
 
 export function render(vnode,rootContainer){
@@ -6,7 +7,40 @@ export function render(vnode,rootContainer){
 
 function patch(vnode,container:any){// patch() 用于递归处理component
     // 判断 是component 还是 element
-    processComponent(vnode,container)
+    // vnode.type -> object || string
+    console.log(vnode.type);
+    if(typeof vnode.type==='string'){
+        mountElement(vnode,container)
+    }else if(isObject(vnode.type)){
+        processComponent(vnode,container)
+    }
+}
+
+function mountElement(vnode,container:any){
+    const el=document.createElement(vnode.type)
+
+    // children -> string || array
+    const {children}=vnode
+    if(typeof children==='string'){
+        el.textContent=children
+    }else if(Array.isArray(children)){
+        mountChildren(vnode,el)
+    }
+
+    // props
+    const {props}=vnode
+    for(let key in props){
+        const val=props[key]
+        el.setAttribute(key,val)
+    }
+
+    container.append(el)
+}
+
+function mountChildren(vnode,container){
+    vnode.children.forEach((v)=>{
+        patch(v,container)
+    })
 }
 
 function processComponent(vnode,container:any){
@@ -21,6 +55,6 @@ function mountComponent(vnode,container:any){
 
 function setupRenderEffect(instance,container:any){
     // 调用render()返回vnode -> patch()
-    const subTree=instance.render
+    const subTree=instance.render()
     patch(subTree,container)
 }
