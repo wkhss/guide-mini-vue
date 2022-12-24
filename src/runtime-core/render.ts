@@ -17,7 +17,8 @@ function patch(vnode,container:any){// patch() 用于递归处理component
 }
 
 function mountElement(vnode,container:any){
-    const el=document.createElement(vnode.type)
+    // vnode -> element -> div
+    const el=(vnode.el=document.createElement(vnode.type))
 
     // children -> string || array
     const {children}=vnode
@@ -47,14 +48,17 @@ function processComponent(vnode,container:any){
     mountComponent(vnode,container)// 挂载组件
 }
 
-function mountComponent(vnode,container:any){
-    const instance=createComponentInstance(vnode)// 抽离组件对象 并 创建组件实例 
+function mountComponent(instanceVNode,container:any){
+    const instance=createComponentInstance(instanceVNode)// 抽离组件对象 并 创建组件实例 
     setupComponent(instance)
-    setupRenderEffect(instance,container)
+    setupRenderEffect(instanceVNode,instance,container)
 }
 
-function setupRenderEffect(instance,container:any){
+function setupRenderEffect(instanceVNode,instance,container:any){
+    const {proxy}=instance
     // 调用render()返回vnode -> patch()
-    const subTree=instance.render()
+    const subTree=instance.render.call(proxy)
     patch(subTree,container)
+    // element -> mount
+    instanceVNode.el=subTree.el
 }
