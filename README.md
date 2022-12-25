@@ -13,3 +13,4 @@
 9. 使用 rollup 打包库
 10. 实现 初始化 element 主流程
 11. 实现 组件代理对象 
+12. 实现 shapeFlags
