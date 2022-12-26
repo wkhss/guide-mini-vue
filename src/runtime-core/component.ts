@@ -1,16 +1,20 @@
+import { shallowReadonly } from "../reactivity/reactive"
+import { initProps } from "./componentProps"
 import { PublicInstanceProxyHandlers } from "./componentPublicInstance"
 
 export function createComponentInstance(vnode){
     const component={
         vnode,
         type:vnode.type,
-        setupState:{}
+        setupState:{},
+        props:{},
     }
     return component
 }
 
 export function setupComponent(instance){
     // initProps
+    initProps(instance,instance.vnode.props)
     // initSlots
     setupStatefulComponent(instance)// 处理 调用setup() 之后的返回值
 } 
@@ -20,7 +24,7 @@ function setupStatefulComponent(instance){
     instance.proxy=new Proxy({_:instance},PublicInstanceProxyHandlers)
     const {setup}=component
     if(setup){// setup maybe is null
-        const setupResult = setup()
+        const setupResult = setup(shallowReadonly(instance.props))
         // setup maybe is Function or Object
         handleSetupResult(instance,setupResult)// 当 setup 为 Object
     }

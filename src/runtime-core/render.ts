@@ -9,7 +9,7 @@ export function render(vnode,rootContainer){
 function patch(vnode,container:any){// patch() 用于递归处理component
     // 判断 是component 还是 element
     // vnode.type -> object || string
-    console.log(vnode.type);
+    // console.log(vnode.type);
     const { shapeFlags } = vnode
     if(ShapeFlags.ELEMENT & shapeFlags){
         mountElement(vnode,container)
@@ -44,7 +44,14 @@ function mountElement(vnode,container:any){
     const {props}=vnode
     for(let key in props){
         const val=props[key]
-        el.setAttribute(key,val)
+        // on + Event name 
+        const isOn=(key:string)=>/^on[A-Z]/.test(key)
+        if(isOn(key)){//if(key === 'onClick'){
+            const event=key.slice(2).toLowerCase()
+            el.addEventListener(event,val)
+        }else{
+            el.setAttribute(key,val)
+        }
     }
 
     container.append(el)
