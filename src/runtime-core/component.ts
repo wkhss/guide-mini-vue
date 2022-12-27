@@ -1,6 +1,8 @@
 import { shallowReadonly } from "../reactivity/reactive"
+import { emit } from "./componentEmit"
 import { initProps } from "./componentProps"
 import { PublicInstanceProxyHandlers } from "./componentPublicInstance"
+import { initSlots } from "./componentSlots"
 
 export function createComponentInstance(vnode){
     const component={
@@ -8,7 +10,10 @@ export function createComponentInstance(vnode){
         type:vnode.type,
         setupState:{},
         props:{},
+        slots:{},
+        emit:()=>{},
     }
+    component.emit=emit.bind(null,component) as any
     return component
 }
 
@@ -16,6 +21,7 @@ export function setupComponent(instance){
     // initProps
     initProps(instance,instance.vnode.props)
     // initSlots
+    initSlots(instance,instance.vnode.children)
     setupStatefulComponent(instance)// 处理 调用setup() 之后的返回值
 } 
 
@@ -24,7 +30,9 @@ function setupStatefulComponent(instance){
     instance.proxy=new Proxy({_:instance},PublicInstanceProxyHandlers)
     const {setup}=component
     if(setup){// setup maybe is null
-        const setupResult = setup(shallowReadonly(instance.props))
+        const setupResult = setup(shallowReadonly(instance.props),{
+            emit:instance.emit
+        })
         // setup maybe is Function or Object
         handleSetupResult(instance,setupResult)// 当 setup 为 Object
     }
