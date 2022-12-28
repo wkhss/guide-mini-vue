@@ -16,3 +16,4 @@
 12. 实现 shapeFlags
 13. 实现 注册事件 组件props 功能
 14. 实现 组件emit 组件slots 功能
+15. 实现 Fragment 和 Text 类型节点 || getCurrentInstance

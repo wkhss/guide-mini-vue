@@ -1,6 +1,7 @@
 import { isObject } from "../shared"
 import { ShapeFlags } from "../shared/ShapeFlags";
 import { createComponentInstance, setupComponent} from "./component"
+import { Fragment,Text } from "./vnode";
 
 export function render(vnode,rootContainer){
     patch(vnode,rootContainer)
@@ -10,17 +11,41 @@ function patch(vnode,container:any){// patch() 用于递归处理component
     // 判断 是component 还是 element
     // vnode.type -> object || string
     // console.log(vnode.type);
-    const { shapeFlags } = vnode
-    if(ShapeFlags.ELEMENT & shapeFlags){
-        mountElement(vnode,container)
-    }else if(ShapeFlags.STATEFUL_COMPONENT & shapeFlags){
-        processComponent(vnode,container)
+    const { type, shapeFlags } = vnode
+    switch(type){
+        case Fragment:
+            processFragment(vnode,container)
+        break;
+        case Text:
+            processText(vnode,container)
+        break;
+        default:
+            if(ShapeFlags.ELEMENT & shapeFlags){
+                processElement(vnode,container)
+            }else if(ShapeFlags.STATEFUL_COMPONENT & shapeFlags){
+                processComponent(vnode,container)
+            }
+        break;
     }
     /* if(typeof vnode.type==='string'){
         mountElement(vnode,container)
     }else if(isObject(vnode.type)){
         processComponent(vnode,container)
     } */
+}
+
+function processText(vnode,container:any){
+    const {children}=vnode
+    const textVNode=(vnode.el=document.createTextNode(children))
+    container.append(textVNode)
+}
+
+function processFragment(vnode,container:any){
+    mountChildren(vnode,container)
+}
+
+function processElement(vnode,container:any){
+    mountElement(vnode,container)
 }
 
 function mountElement(vnode,container:any){
