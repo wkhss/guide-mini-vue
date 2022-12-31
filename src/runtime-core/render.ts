@@ -1,3 +1,4 @@
+import { effect } from "../reactivity/effect";
 import { isObject } from "../shared"
 import { ShapeFlags } from "../shared/ShapeFlags";
 import { createComponentInstance, setupComponent} from "./component"
@@ -8,26 +9,27 @@ export function createRender(options){
     const {createElement:hostCreateElement,patchProp:hostPatchProp,insert:hostInsert}=options
 
     function render(vnode,rootContainer){
-        patch(vnode,rootContainer,null)
+        patch(null,vnode,rootContainer,null)
     }
 
-    function patch(vnode,container:any,parentComponent){// patch() 用于递归处理component
+    // n1 old n2 new
+    function patch(n1,n2,container:any,parentComponent){// patch() 用于递归处理component
         // 判断 是component 还是 element
         // vnode.type -> object || string
         // console.log(vnode.type);
-        const { type, shapeFlags } = vnode
+        const { type, shapeFlags } = n2
         switch(type){
             case Fragment:
-                processFragment(vnode,container,parentComponent)
+                processFragment(n1,n2,container,parentComponent)
             break;
             case Text:
-                processText(vnode,container)
+                processText(n1,n2,container)
             break;
             default:
                 if(ShapeFlags.ELEMENT & shapeFlags){
-                    processElement(vnode,container,parentComponent)
+                    processElement(n1,n2,container,parentComponent)
                 }else if(ShapeFlags.STATEFUL_COMPONENT & shapeFlags){
-                    processComponent(vnode,container,parentComponent)
+                    processComponent(n1,n2,container,parentComponent)
                 }
             break;
         }
@@ -38,18 +40,29 @@ export function createRender(options){
         } */
     }
 
-    function processText(vnode,container:any){
-        const {children}=vnode
-        const textVNode=(vnode.el=document.createTextNode(children))
+    function processText(n1,n2,container:any){
+        const {children}=n2
+        const textVNode=(n2.el=document.createTextNode(children))
         container.append(textVNode)
     }
 
-    function processFragment(vnode,container:any,parentComponent){
-        mountChildren(vnode,container,parentComponent)
+    function processFragment(n1,n2,container:any,parentComponent){
+        mountChildren(n2,container,parentComponent)
     }
 
-    function processElement(vnode,container:any,parentComponent){
-        mountElement(vnode,container,parentComponent)
+    function processElement(n1,n2,container:any,parentComponent){
+        if(!n1){// n1 不存在 就是 初始化
+            mountElement(n2,container,parentComponent)
+        }else{
+            patchElement(n1,n2,container)
+        }
+    }
+
+    function patchElement(n1,n2,container){
+        console.log('patchElement');
+        console.log('n1',n1);
+        console.log('n2',n2);
+        
     }
 
     function mountElement(vnode,container:any,parentComponent){
@@ -82,12 +95,12 @@ export function createRender(options){
 
     function mountChildren(vnode,container,parentComponent){
         vnode.children.forEach((v)=>{
-            patch(v,container,parentComponent)
+            patch(null,v,container,parentComponent)
         })
     }
 
-    function processComponent(vnode,container:any,parentComponent){
-        mountComponent(vnode,container,parentComponent)// 挂载组件
+    function processComponent(n1,n2,container:any,parentComponent){
+        mountComponent(n2,container,parentComponent)// 挂载组件
     }
 
     function mountComponent(instanceVNode,container:any,parentComponent){
@@ -97,12 +110,31 @@ export function createRender(options){
     }
 
     function setupRenderEffect(instanceVNode,instance,container:any){
-        const {proxy}=instance
-        // 调用render()返回vnode -> patch()
-        const subTree=instance.render.call(proxy)
-        patch(subTree,container,instance)
-        // element -> mount
-        instanceVNode.el=subTree.el
+        // 实现 响应式数据 依赖收集
+        effect(()=>{
+            // 判断 是 init 还是 update
+            if(!instance.isMounted){
+                console.log('init');
+                
+                const {proxy}=instance
+                // 调用render()返回vnode -> patch()
+                const subTree=( instance.subTree=instance.render.call(proxy) )
+                patch(null,subTree,container,instance)
+                // element -> mount
+                instanceVNode.el=subTree.el
+                instance.isMounted=true
+            }else{
+                console.log('update');
+                
+                const {proxy}=instance
+                // 调用render()返回vnode -> patch()
+                const subTree=instance.render.call(proxy)// new component instance
+                const prevSubTree=instance.subTree// old component instance
+                instance.subTree=subTree
+                
+                patch(prevSubTree,subTree,container,instance)
+            }
+        })
     }
     return {
         createApp:createAppApi(render)

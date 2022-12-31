@@ -19,3 +19,4 @@
 15. 实现 Fragment 和 Text 类型节点 || getCurrentInstance
 16. 实现 provide-inject 功能
 17. 实现 自定义渲染器 custom renderer
+18. 更新 element流程搭建
