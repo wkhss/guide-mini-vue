@@ -15,27 +15,27 @@ export function createRender(options){
     }=options
 
     function render(vnode,rootContainer){
-        patch(null,vnode,rootContainer,null)
+        patch(null,vnode,rootContainer,null,null)
     }
 
     // n1 old n2 new
-    function patch(n1,n2,container:any,parentComponent){// patch() 用于递归处理component
+    function patch(n1,n2,container:any,parentComponent,anthro){// patch() 用于递归处理component
         // 判断 是component 还是 element
         // vnode.type -> object || string
         // console.log(vnode.type);
         const { type, shapeFlags } = n2
         switch(type){
             case Fragment:
-                processFragment(n1,n2,container,parentComponent)
+                processFragment(n1,n2,container,parentComponent,anthro)
             break;
             case Text:
                 processText(n1,n2,container)
             break;
             default:
                 if(ShapeFlags.ELEMENT & shapeFlags){
-                    processElement(n1,n2,container,parentComponent)
+                    processElement(n1,n2,container,parentComponent,anthro)
                 }else if(ShapeFlags.STATEFUL_COMPONENT & shapeFlags){
-                    processComponent(n1,n2,container,parentComponent)
+                    processComponent(n1,n2,container,parentComponent,anthro)
                 }
             break;
         }
@@ -52,19 +52,19 @@ export function createRender(options){
         container.append(textVNode)
     }
 
-    function processFragment(n1,n2,container:any,parentComponent){
-        mountChildren(n2.children,container,parentComponent)
+    function processFragment(n1,n2,container:any,parentComponent,anthro){
+        mountChildren(n2.children,container,parentComponent,anthro)
     }
 
-    function processElement(n1,n2,container:any,parentComponent){
+    function processElement(n1,n2,container:any,parentComponent,anthro){
         if(!n1){// n1 不存在 就是 初始化
-            mountElement(n2,container,parentComponent)
+            mountElement(n2,container,parentComponent,anthro)
         }else{
-            patchElement(n1,n2,container,parentComponent)
+            patchElement(n1,n2,container,parentComponent,anthro)
         }
     }
 
-    function patchElement(n1,n2,container,parentComponent){
+    function patchElement(n1,n2,container,parentComponent,anthro){
         console.log('patchElement');
         console.log('n1',n1);
         console.log('n2',n2);
@@ -74,11 +74,11 @@ export function createRender(options){
 
         const el= ( n2.el = n1.el ) 
         
-        patchChildren(n1,n2,el,parentComponent)
+        patchChildren(n1,n2,el,parentComponent,anthro)
         patchProps(el,oldProps,newProps)
     }
     
-    function patchChildren(n1,n2,container,parentComponent){
+    function patchChildren(n1,n2,container,parentComponent,anthro){
         const prevShapeFlags=n1.shapeFlags
         const c1=n1.children
         const {shapeFlags}=n2
@@ -101,9 +101,61 @@ export function createRender(options){
                 hostSetElementText(container,c2)
             }
         }else{// new is array
-            if(shapeFlags & ShapeFlags.ARRAY_CHILDREN){
+            if(prevShapeFlags & ShapeFlags.TEXT_CHILDREN){// old is text
                 hostSetElementText(container,'')
-                mountChildren(c2,container,parentComponent)
+                mountChildren(c2,container,parentComponent,anthro)
+            }else{// old is array
+                patchKeyedChildren(c1,c2,container,parentComponent,anthro)
+            }
+        }
+    }
+    
+    function patchKeyedChildren(c1,c2,container,parentComponent,processAnthro){
+        const l2=c2.length
+        let e1=c1.length-1
+        let i=0
+        let e2=l2-1
+
+        function isSomeVNodeType(n1,n2){
+            return n1.key === n2.key && n1.type === n2.type
+        }
+
+        while(i<=e1&&i<=e2){
+            const n1=c1[i]
+            const n2=c2[i]
+            if(isSomeVNodeType(n1,n2)){
+                patch(n1,n2,container,parentComponent,processAnthro)
+            }else{
+                break
+            }
+            i++
+        }
+
+        while(i<=e1&&i<=e2){
+            const n1=c1[e1]
+            const n2=c2[e2]
+            if(isSomeVNodeType(n1,n2)){
+                patch(n1,n2,container,parentComponent,processAnthro)
+            }else{
+                break
+            }
+            e1--
+            e2--
+        }
+
+        if(i>e1){
+            if(i<=e2){
+                const nextPos=e2+1
+                const anthro=nextPos<l2?c2[nextPos].el:null
+                while(i<=e2){
+                    patch(null,c2[i],container,parentComponent,anthro)
+                    i++
+                }
+            }
+        }else if(i>e2){
+            while(i<=e1){
+                hostRemove(c1[i].el)
+                i++
             }
         }
     }
@@ -134,7 +186,7 @@ export function createRender(options){
         }
     }
 
-    function mountElement(vnode,container:any,parentComponent){
+    function mountElement(vnode,container:any,parentComponent,anthro){
         // vnode -> element -> div
         // const el=(vnode.el=document.createElement(vnode.type))
         const el=(vnode.el=hostCreateElement(vnode.type))
@@ -144,7 +196,7 @@ export function createRender(options){
         if(ShapeFlags.TEXT_CHILDREN & shapeFlags){
             el.textContent=children
         }else if(ShapeFlags.ARRAY_CHILDREN & shapeFlags){
-            mountChildren(vnode.children,el,parentComponent)
+            mountChildren(vnode.children,el,parentComponent,anthro)
         }
         /* if(typeof children==='string'){
             el.textContent=children
@@ -159,26 +211,26 @@ export function createRender(options){
             hostPatchProp(el,key,null,val)
         }
 
-        hostInsert(el,container)
+        hostInsert(el,container,anthro)
     }
 
-    function mountChildren(children,container,parentComponent){
+    function mountChildren(children,container,parentComponent,anthro){
         children.forEach((v)=>{
-            patch(null,v,container,parentComponent)
+            patch(null,v,container,parentComponent,anthro)
         })
     }
 
-    function processComponent(n1,n2,container:any,parentComponent){
-        mountComponent(n2,container,parentComponent)// 挂载组件
+    function processComponent(n1,n2,container:any,parentComponent,anthro){
+        mountComponent(n2,container,parentComponent,anthro)// 挂载组件
     }
 
-    function mountComponent(instanceVNode,container:any,parentComponent){
+    function mountComponent(instanceVNode,container:any,parentComponent,anthro){
         const instance=createComponentInstance(instanceVNode,parentComponent)// 抽离组件对象 并 创建组件实例 
         setupComponent(instance)
-        setupRenderEffect(instanceVNode,instance,container)
+        setupRenderEffect(instanceVNode,instance,container,anthro)
     }
 
-    function setupRenderEffect(instanceVNode,instance,container:any){
+    function setupRenderEffect(instanceVNode,instance,container:any,anthro){
         // 实现 响应式数据 依赖收集
         effect(()=>{
             // 判断 是 init 还是 update
@@ -188,7 +240,7 @@ export function createRender(options){
                 const {proxy}=instance
                 // 调用render()返回vnode -> patch()
                 const subTree=( instance.subTree=instance.render.call(proxy) )
-                patch(null,subTree,container,instance)
+                patch(null,subTree,container,instance,anthro)
                 // element -> mount
                 instanceVNode.el=subTree.el
                 instance.isMounted=true
@@ -201,7 +253,7 @@ export function createRender(options){
                 const prevSubTree=instance.subTree// old component instance
                 instance.subTree=subTree
                 
-                patch(prevSubTree,subTree,container,instance)
+                patch(prevSubTree,subTree,container,instance,anthro)
             }
         })
     }
