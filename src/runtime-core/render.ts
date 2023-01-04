@@ -120,6 +120,7 @@ export function createRender(options){
             return n1.key === n2.key && n1.type === n2.type
         }
 
+        // 1.右侧对比
         while(i<=e1&&i<=e2){
             const n1=c1[i]
             const n2=c2[i]
@@ -131,6 +132,7 @@ export function createRender(options){
             i++
         }
 
+        // 2.左侧对比
         while(i<=e1&&i<=e2){
             const n1=c1[e1]
             const n2=c2[e2]
@@ -143,6 +145,7 @@ export function createRender(options){
             e2--
         }
 
+        // 3.新的 比 老的 长
         if(i>e1){
             if(i<=e2){
                 const nextPos=e2+1
@@ -152,10 +155,50 @@ export function createRender(options){
                     i++
                 }
             }
-        }else if(i>e2){
+        }else if(i>e2){// 4.老的 比 新的 长
             while(i<=e1){
                 hostRemove(c1[i].el)
                 i++
+            }
+        }else{
+            let s1=i
+            let s2=i
+
+            const toBePatched=e2-s2+1
+            let patched=0
+
+            const KeyToNewIndexMap=new Map()
+            for(let i=s2;i<=e2;i++){
+                const nextChild=c2[i].key
+                KeyToNewIndexMap.set(nextChild,i)
+            }
+
+            for(let i=s1;i<=e1;i++){
+                const prevChild=c1[i]
+
+                if(patched>=toBePatched){
+                    hostRemove(prevChild.el)
+                    continue
+                }
+
+                let nextIndex
+                if(prevChild.key!==null){
+                    nextIndex=KeyToNewIndexMap.get(prevChild.key)
+                }else{
+                    for(let j=s2;j<e2;j++){
+                        if(isSomeVNodeType(prevChild,c2[j])){
+                            nextIndex=j
+                            break
+                        }
+                    }
+                }
+
+                if(nextIndex===undefined){
+                    hostRemove(prevChild.el)
+                }else{
+                    patch(prevChild,c2[nextIndex],container,parentComponent,null)
+                    patched++
+                }
             }
         }
     }
