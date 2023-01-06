@@ -160,14 +160,19 @@ export function createRender(options){
                 hostRemove(c1[i].el)
                 i++
             }
-        }else{
+        }else{// 5.对比 中间部分
             let s1=i
             let s2=i
 
             const toBePatched=e2-s2+1
             let patched=0
 
+            let moved=false
+            let maxNewIndexSoFar=0
             const KeyToNewIndexMap=new Map()
+            const newIndexToOldIndexMap=new Array(toBePatched)
+            for(let i=0;i<toBePatched;i++)newIndexToOldIndexMap[i]=0
+
             for(let i=s2;i<=e2;i++){
                 const nextChild=c2[i].key
                 KeyToNewIndexMap.set(nextChild,i)
@@ -176,28 +181,57 @@ export function createRender(options){
             for(let i=s1;i<=e1;i++){
                 const prevChild=c1[i]
 
+                // 5.1.1优化删除逻辑
                 if(patched>=toBePatched){
                     hostRemove(prevChild.el)
                     continue
                 }
 
-                let nextIndex
+                let newIndex
                 if(prevChild.key!==null){
-                    nextIndex=KeyToNewIndexMap.get(prevChild.key)
+                    newIndex=KeyToNewIndexMap.get(prevChild.key)
                 }else{
                     for(let j=s2;j<e2;j++){
                         if(isSomeVNodeType(prevChild,c2[j])){
-                            nextIndex=j
+                            newIndex=j
                             break
                         }
                     }
                 }
 
-                if(nextIndex===undefined){
-                    hostRemove(prevChild.el)
+                if(newIndex===undefined){
+                    hostRemove(prevChild.el)// 5.1删除老的
                 }else{
-                    patch(prevChild,c2[nextIndex],container,parentComponent,null)
+                    if(newIndex>=maxNewIndexSoFar){
+                        maxNewIndexSoFar=newIndex
+                    }else{
+                        moved=true
+                    }
+
+                    newIndexToOldIndexMap[newIndex-s2]=i+1
+
+                    patch(prevChild,c2[newIndex],container,parentComponent,null)
                     patched++
+                }
+            }
+
+            const increasingNewIndexSequence=moved?getSequence(newIndexToOldIndexMap):[]
+            let j=increasingNewIndexSequence.length-1
+
+            for(let i=toBePatched-1;i>=0;i--){
+                const nextIndex=s2+i
+                const nextChild=c2[nextIndex]
+                const anthro=nextIndex+1<l2?c2[nextIndex+1].el:null
+                // 5.3创建新节点
+                if(newIndexToOldIndexMap[i]===0){
+                    patch(null,nextChild,container,parentComponent,anthro)
+                }else if(moved){
+                    // 5.2.1移动
+                    if(j<0||i!==increasingNewIndexSequence[j]){
+                        hostInsert(nextChild.el,container,anthro)
+                    }else{
+                        j--
+                    }
                 }
             }
         }
@@ -304,3 +338,43 @@ export function createRender(options){
         createApp:createAppApi(render)
     }
 }
+function getSequence(arr) {
+    const p = arr.slice();
+    const result = [0];
+    let i, j, u, v, c;
+    const len = arr.length;
+    for (i = 0; i < len; i++) {
+      const arrI = arr[i];
+      if (arrI !== 0) {
+        j = result[result.length - 1];
+        if (arr[j] < arrI) {
+          p[i] = j;
+          result.push(i);
+          continue;
+        }
+        u = 0;
+        v = result.length - 1;
+        while (u < v) {
+          c = (u + v) >> 1;
+          if (arr[result[c]] < arrI) {
+            u = c + 1;
+          } else {
+            v = c;
+          }
+        }
+        if (arrI < arr[result[u]]) {
+          if (u > 0) {
+            p[i] = result[u - 1];
+          }
+          result[u] = i;
+        }
+      }
+    }
+    u = result.length;
+    v = result[u - 1];
+    while (u-- > 0) {
+      result[u] = v;
+      v = p[v];
+    }
+    return result;
+  }
