@@ -2,7 +2,9 @@ import { effect } from "../reactivity/effect";
 import { EMPTY_OBJECT, isObject } from "../shared"
 import { ShapeFlags } from "../shared/ShapeFlags";
 import { createComponentInstance, setupComponent} from "./component"
+import { shouldUpdateComponent } from "./componentUpdateUtils";
 import { createAppApi } from "./createApp";
+import { queueJob } from "./scheduler";
 import { Fragment,Text } from "./vnode";
 
 export function createRender(options){
@@ -297,19 +299,34 @@ export function createRender(options){
         })
     }
 
-    function processComponent(n1,n2,container:any,parentComponent,anthro){
-        mountComponent(n2,container,parentComponent,anthro)// 挂载组件
+    function processComponent(n1,n2,container:any,parentComponent,anthro){ 
+        if(!n1){
+            mountComponent(n2,container,parentComponent,anthro)// 挂载组件
+        }else{
+            updateComponent(n1,n2)
+        }
+    }
+
+    function updateComponent(n1,n2){
+        const instance=( n2.component=n1.component )
+        if(shouldUpdateComponent(n1,n2)){
+            instance.next=n2
+            instance.update()
+        }else{
+            n2.el=n1.el
+            instance.vnode=n2
+        }
     }
 
     function mountComponent(instanceVNode,container:any,parentComponent,anthro){
-        const instance=createComponentInstance(instanceVNode,parentComponent)// 抽离组件对象 并 创建组件实例 
+        const instance=(instanceVNode.component=createComponentInstance(instanceVNode,parentComponent))// 抽离组件对象 并 创建组件实例 
         setupComponent(instance)
         setupRenderEffect(instanceVNode,instance,container,anthro)
     }
 
     function setupRenderEffect(instanceVNode,instance,container:any,anthro){
         // 实现 响应式数据 依赖收集
-        effect(()=>{
+        instance.update=effect(()=>{
             // 判断 是 init 还是 update
             if(!instance.isMounted){
                 console.log('init');
@@ -318,11 +335,16 @@ export function createRender(options){
                 // 调用render()返回vnode -> patch()
                 const subTree=( instance.subTree=instance.render.call(proxy) )
                 patch(null,subTree,container,instance,anthro)
-                // element -> mount
+               // element -> mount
                 instanceVNode.el=subTree.el
                 instance.isMounted=true
             }else{
                 console.log('update');
+                const {next,vnode}=instance
+                if(next){
+                    next.el=vnode.el
+                    updateComponentPreRender(instance,next)
+                }
                 
                 const {proxy}=instance
                 // 调用render()返回vnode -> patch()
@@ -332,12 +354,25 @@ export function createRender(options){
                 
                 patch(prevSubTree,subTree,container,instance,anthro)
             }
+        },{
+            scheduler(){
+                console.log('update-scheduler');
+                queueJob(instance.update)
+                
+            }
         })
     }
     return {
         createApp:createAppApi(render)
     }
 }
+
+function updateComponentPreRender(instance,nextVNode){
+    instance.vnode=nextVNode
+    instance.next=null
+    instance.props=nextVNode.props
+}
+
 function getSequence(arr) {
     const p = arr.slice();
     const result = [0];
