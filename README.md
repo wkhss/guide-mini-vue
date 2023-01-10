@@ -27,3 +27,4 @@
 23. 更新 element 的 children - 双端对比diff 算法 （3）
 24. 学习尤大解决bug的处理方式
 25. 实现 组件更新 || nextTick 功能
+26. 实现 解析 插值 || element 功能
